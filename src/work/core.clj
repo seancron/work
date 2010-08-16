@@ -2,7 +2,8 @@
   (:import (java.util.concurrent
 	    Executors ExecutorService TimeUnit LinkedBlockingQueue))
   (:import clojure.lang.RT)
-  (:use clj-serializer.core))
+  (:use clj-serializer.core)
+  (:require [clj-json [core :as json]]))
 
 (defn from-var [#^Var fn-var]
   (let [m (meta fn-var)]
@@ -17,16 +18,25 @@
 	 (catch Exception _ _))
     (.deref (RT/var ns-name, fn-name)))))
 
+(defn- recieve* [msg]
+  (let [[[ns-name fn-name] & args] msg]
+    (cons (to-var ns-name fn-name) args)))
+
+(defn recieve-clj [msg]
+  (recieve* (deserialize (.getBytes msg) (Object.))))
+
+(defn recieve-json [msg]
+  (recieve* (json/parse-string msg)))
+
+(def clj-worker (comp eval recieve-clj))
+
+(def json-worker (comp eval recieve-json))
+
 (defn send-clj [fn-var & args]
   (String. (serialize (cons (from-var fn-var) args))))
 
-(defn recieve-clj [msg]
-  (let [[[ns-name fn-name] & args]
-	(deserialize (.getBytes msg) (Object.))]
-    (cons (to-var ns-name fn-name) args)))
-
-(defn send-json [])
-(defn recieve-json [msg])
+(defn send-json [fn-var & args]
+  (json/generate-string (cons (from-var fn-var) args)))
 
 (defn available-processors []
 (.availableProcessors (Runtime/getRuntime)))
@@ -82,11 +92,10 @@
 ;;TODO; unable to shutdown pool. seems recursive fns are not responding to interrupt. http://download.oracle.com/javase/tutorial/essential/concurrency/interrupt.html
 ;;TODO: use another thread to check futures and make sure workers don't fail, don't hang, and call for work within their time limit?
 (defn queue-work
-"schedule-work one worker function f per thread.  f is either passed in as an argument when constructing the worker pool (all workers use the same fn) or f is passed with its args over the queue (each worker executes an arbitrary fn.)
+"schedule-work one worker function f per thread.  f can either be a fn that is directly applied to each task (all workers use the same fn) or f builds and evals a worker from a fn & args passed over the queue (each worker executes an arbitrary fn.)  Examples of the latter are clj-worker and json-wroker.
 
 Each worker fn polls the work queue via get-work fn, applies a fn to each dequeued item, puts the result with put-done and recursively checks for more work.  If it doesn't find new work, it waits until checking for more work."
-([f get-work put-done threads]
-  [f get-work put-done threads]
+[f get-work put-done threads]
   (let [pool (Executors/newFixedThreadPool threads)
 	fns (repeatedly threads
 			(fn [] (do
@@ -96,8 +105,6 @@ Each worker fn polls the work queue via get-work fn, applies a fn to each dequeu
 				 (recur))))
 	futures (doall (map #(.submit pool %) fns))]
     pool))
-([get-work put-done threads]
-  (queue-work (comp eval recieve-clj) get-work put-done threads)))
 
 (defn shutdown
   "Initiates an orderly shutdown in which previously submitted tasks are executed, but no new tasks will be accepted. Invocation has no additional effect if already shut down."
