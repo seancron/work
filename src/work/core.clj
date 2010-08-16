@@ -1,7 +1,8 @@
 (ns work.core
   (:import (java.util.concurrent
 	    Executors ExecutorService TimeUnit LinkedBlockingQueue))
-  (:import clojure.lang.RT))
+  (:import clojure.lang.RT)
+  (:use clj-serializer.core))
 
 (defn from-var [#^Var fn-var]
   (let [m (meta fn-var)]
@@ -15,6 +16,17 @@
     (try (RT/load root)
 	 (catch Exception _ _))
     (.deref (RT/var ns-name, fn-name)))))
+
+(defn send-clj [fn-var & args]
+  (String. (serialize (cons (from-var fn-var) args))))
+
+(defn recieve-clj [msg]
+  (let [[[ns-name fn-name] & args]
+	(deserialize (.getBytes msg) (Object.))]
+    (cons (to-var ns-name fn-name) args)))
+
+(defn send-json [])
+(defn recieve-json [msg])
 
 (defn available-processors []
 (.availableProcessors (Runtime/getRuntime)))
@@ -67,25 +79,25 @@
 (defn peek [q] (.peek q))
 (defn poll [q] (.poll q))
 
-;;TODO: fn & data on the queue, take them off, intern the fn, and apply.
 ;;TODO; unable to shutdown pool. seems recursive fns are not responding to interrupt. http://download.oracle.com/javase/tutorial/essential/concurrency/interrupt.html
+;;TODO: use another thread to check futures and make sure workers don't fail, don't hang, and call for work within their time limit?
 (defn queue-work
-"schedule-work one worker function f per thread.
+"schedule-work one worker function f per thread.  f is either passed in as an argument when constructing the worker pool (all workers use the same fn) or f is passed with its args over the queue (each worker executes an arbitrary fn.)
 
-f can be a pipeline of functions - for example, the work itself, writing the result of the work to s3 and notifying the system the work is complete by placing it on the done queue.
-
-Each worker fn polls the work queue via get-work fn, applies a fn to each dequeued item, and recursively checks for more work.  If it doesn't find new work, it waits until checking for more work."
-[f get-work threads]
+Each worker fn polls the work queue via get-work fn, applies a fn to each dequeued item, puts the result with put-done and recursively checks for more work.  If it doesn't find new work, it waits until checking for more work."
+([f get-work put-done threads]
+  [f get-work put-done threads]
   (let [pool (Executors/newFixedThreadPool threads)
 	fns (repeatedly threads
 			(fn [] (do
-				 (if-let [x (get-work)]
-				   (f x)
+				 (if-let [task (get-work)]
+				   (put-done (f task))
 				   (Thread/sleep 5000))
 				 (recur))))
 	futures (doall (map #(.submit pool %) fns))]
-    ;;TODO: use another thread to check futures and make sure workers don't fail, don't hang, and call for work within their time limit?
     pool))
+([get-work put-done threads]
+  (queue-work (comp eval recieve-clj) get-work put-done threads)))
 
 (defn shutdown
   "Initiates an orderly shutdown in which previously submitted tasks are executed, but no new tasks will be accepted. Invocation has no additional effect if already shut down."
