@@ -57,8 +57,9 @@
        (.printStackTrace e))))
 
 (defn schedule-work
+  "schedules work. cron for clojure fns. Schedule a single fn with a pool to run every n seconds, where n is specified by the rate arg, or supply a vector of fn-rate tuples to schedule a bunch of fns at once."
   ([pool f rate]
-     (.schedule-workAtFixedRate pool (try-job f) 0 rate TimeUnit/SECONDS))
+     (.scheduleAtFixedRate pool (try-job f) 0 rate TimeUnit/SECONDS))
   ([jobs]
      (let [pool (Executors/newSingleThreadScheduledExecutor)] 
        (doall (for [[f rate] jobs]
