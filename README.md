@@ -50,7 +50,10 @@ The doc string should explain what's going on here.
     -------------------------
     work.core/queue-work
     ([f get-work put-done threads])
-      schedule-work one worker function f per thread.  f can either be a fn that is directly applied to each task (all workers use the same fn) or f builds and evals a worker from a fn & args passed over the queue (each worker executes an arbitrary fn.)  Examples of the latter are clj-worker and json-wroker.
+      schedule-work one worker function f per thread.
+      f can either be a fn that is directly applied to each task (all workers use the same fn)
+      or f builds and evals a worker from a fn & args passed over the queue (each worker executes an arbitrary fn.)
+      Examples of the latter are clj-worker and json-wroker.
 
 As you can see from the test, work contains a local-queue for testing, which creates a LinkedBlockingQueue.
 
@@ -103,7 +106,7 @@ work can schedule work as well.
     foo
     foo
 
-*note: if you are using slime in emacs, you need to look in *inferior-lisp* for these results.
+*note: if you are using slime in emacs, you need to look in inferior-lisp for these results.
 
 A look at the docstring shows what is going on here.
 
@@ -111,7 +114,9 @@ A look at the docstring shows what is going on here.
     -------------------------
     work.core/schedule-work
     ([pool f rate] [jobs])
-      schedules work. cron for clojure fns.  Schedule a single fn with a pool to run every n seconds, where n is specified by the rate arg, or supply a vector of fn-rate tuples to schedule a bunch of fns at once.
+      schedules work. cron for clojure fns.
+      Schedule a single fn with a pool to run every n seconds, where n is specified by the rate arg,
+      or supply a vector of fn-rate tuples to schedule a bunch of fns at once.
 
 ## How to distributed the work across network boundaries?
 
