@@ -27,8 +27,8 @@
 	response-q (work/local-queue)
 	pool (future
 	      (work/queue-work
-	       #(dosync (work/offer response-q (* 10 %)))
-	       #(dosync (work/poll request-q))
+	       #(work/offer response-q (* 10 %))
+	       #(work/poll request-q)
 	       10))
     _ (Thread/sleep 1000)]
 ;;	_ (work/shutdown-now (.get pool))]

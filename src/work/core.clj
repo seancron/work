@@ -1,5 +1,6 @@
 (ns work.core
-  (:import (java.util.concurrent Executors ExecutorService TimeUnit))
+  (:import (java.util.concurrent
+	    Executors ExecutorService TimeUnit LinkedBlockingQueue))
   (:import clojure.lang.RT))
 
 (defn from-var [#^Var fn-var]
@@ -51,14 +52,16 @@
 [fns threads]
   (map #(.get %) (work* fns threads)))
 
-(defn map-work [f xs threads]
+(defn map-work
+"like clojure's map or pmap, but takes a number of threads, executes eagerly, and blocks."
+[f xs threads]
   (work (doall (map (fn [x] #(f x)) xs)) threads))
 
 (defn local-queue
   ([]
-     (java.util.LinkedList.))
+     (LinkedBlockingQueue.))
   ([xs]
-     (java.util.LinkedList. xs)))
+     (LinkedBlockingQueue. xs)))
 
 (defn offer [q v] (.offer q v))
 (defn peek [q] (.peek q))
